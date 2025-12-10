@@ -9,6 +9,14 @@ on:
       working-directory:
         type: string
         default: "."
+      dockerfile:
+        type: string
+        required: false
+        default: "./Dockerfile"
+      context:
+        type: string
+        required: false
+        default: "."
     secrets:
       REGISTRY_USERNAME:
         required: true
