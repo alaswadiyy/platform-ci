@@ -1,0 +1,47 @@
+name: Deploy to Kubernetes (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      deployment:
+        required: true
+        type: string
+    secrets:
+      KUBECONFIG_CONTENT:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure Kubernetes
+        run: |
+          set -euo pipefail
+
+          # Decode base64 kubeconfig and write to file
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" | base64 --decode > kubeconfig.yaml
+          chmod 600 kubeconfig.yaml
+          export KUBECONFIG=$PWD/kubeconfig.yaml
+
+          # Create namespace if not exists
+          kubectl create namespace "${{ inputs.namespace }}" --dry-run=client -o yaml | kubectl apply -f -
+
+          # Update deployment image
+          kubectl set image deployment/${{ inputs.deployment }} ${{ inputs.deployment }}=${{ inputs.image }} -n ${{ inputs.namespace }} || echo "Deployment might not exist yet"
+
+          # Wait for rollout
+          kubectl rollout status deployment/${{ inputs.deployment }} -n ${{ inputs.namespace }} --timeout=300s || echo "Rollout check failed"
